@@ -1,0 +1,100 @@
+﻿@using Microsoft.Extensions.Options
+@using RobinsonNewsletter.Core.Models
+@inject IOptions<RubriqueImageOptions> rubriqueOptionsAccessor
+
+<div>
+    <div class="@GetFormClass()">
+        <div class="form-group">
+            <label for="buttonurl">Choisir Rubrique:</label>
+            <select @onchange="OnSelectionChanged">
+                <option value="" selected disabled>Select a rubrique</option>
+                @foreach (var kvp in rubriqueOptionsAccessor.Value.RubriqueImages)
+                {
+                    <option value="@kvp.Key">@kvp.Key</option>
+                }
+            </select>
+        </div>
+
+        @if (showSections)
+        {
+            <button type="button" class="btn btn-warning" @onclick="AddSection">Add Section</button>
+        }
+
+        @foreach (var section in currentRubrique.Sections)
+        {
+            <div style="position: relative;">
+                <Section newSection="section"></Section>
+                <button type="button" @onclick="() => DeleteSection(section)" style="position: absolute; top: 0; right: 10%; background-color: transparent; border: none; padding: 0;">
+                    <i style="color: black;" class="bi bi-trash3"></i>
+                </button>
+            </div>
+        }
+
+        @if (currentRubrique.Sections.Any())
+        {
+            <button type="button" @onclick="SaveRubrique" class="btn btn-secondary">Save Rubrique</button>
+        }
+
+    </div>
+
+</div>
+
+@if (!showSave)
+{
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #DCD9D9">
+        <img src="@currentRubrique.RubriqueSourceImage" width="186" height="22">
+        <button type="button" @onclick="ModifyRubrique" class="btn btn-secondary" style="background-color: transparent; border: none; padding: 0;">
+            <i style="color: black;" class="bi bi-pencil-square"></i>
+        </button>
+    </div>    
+}
+
+@code {
+    [Parameter]
+    public SingleRubriqueModel currentRubrique { get; set; }
+    private bool showSections = false;
+    private string selectedKey;
+
+    private bool isCollapsed = false;
+    private bool showSave = true;
+
+    private void OnSelectionChanged(ChangeEventArgs e)
+    {
+        selectedKey = e.Value.ToString();
+        if (rubriqueOptionsAccessor.Value.RubriqueImages.ContainsKey(selectedKey))
+        {
+            currentRubrique.RubriqueSourceImage = rubriqueOptionsAccessor.Value.RubriqueImages[selectedKey];
+            showSections = true;
+        }
+    }
+
+    private void AddSection()
+    {
+        currentRubrique.Sections.Add(new SingleSectionModel());
+    }
+
+    private void DeleteSection(SingleSectionModel section)
+    {
+        currentRubrique.Sections.Remove(section);
+    }
+
+    private string GetFormClass()
+    {
+
+        return isCollapsed ? "collapse-transition" : "collapse-show";
+    }
+
+    private async Task SaveRubrique()
+    {
+        isCollapsed = true;
+        await Task.Delay(300);
+        showSave = false;
+    }
+
+    private async Task ModifyRubrique()
+    {
+        isCollapsed = false;
+        await Task.Delay(400);
+        showSave = true;
+    }
+}

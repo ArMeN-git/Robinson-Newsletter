@@ -1,0 +1,151 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using Microsoft.Extensions.Options
+@using RobinsonNewsletter.Core.Models;
+@using RobinsonNewsletter.Core.Services.Email;
+@using Microsoft.AspNetCore.Http;
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IWebHostEnvironment Environment
+@inject IEmailService emailService
+@inject IJSRuntime JSRuntime
+@inject IOptions<RubriqueImageOptions> rubriqueOptionsAccessor
+@inject IOptions<AdminOptions> adminOptionsAccessor
+@inject IOptions<EmailContentOptions> emailContentOptions
+
+@if (isAuthorized)
+{
+    <PageTitle>Send Newsletter</PageTitle>
+
+    <div class="content">
+        <h1 class="form-title">Form of Newsletter</h1>
+
+        <div class="form-container">
+            <EditForm Model="@newsletterModel" OnValidSubmit="@HandleSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="form-group">
+                    <label for="refnumber">Ref Number:</label>
+                    <InputNumber id="refnumber" class="form-control" min="1" @bind-Value="newsletterModel.RefNumber" />
+                    <ValidationMessage For="@(() => newsletterModel.RefNumber)" />
+                </div>
+
+                <button type="button" class="btn btn-success" @onclick="AddRubrique">Add Rubrique</button>
+
+                @foreach (var rubrique in newsletterModel.Rubriques)
+                {
+                    <div style="position: relative;">
+                        <Rubrique currentRubrique="rubrique"></Rubrique>
+                        <button type="button" @onclick="() => DeleteRubrique(rubrique)" style="position: absolute; top: 0; right: 10%; background-color: transparent; border: none; padding: 0;">
+                            <i style="color: black;" class="bi bi-trash3"></i>
+                        </button>
+                    </div>
+                }
+
+                <br>
+                @if (newsletterModel.Rubriques.Any())
+                {
+                    <button type="button" class="btn btn-primary" @onclick="AttemptSubmit">Submit</button>
+                }
+            </EditForm>
+        </div>
+    </div>
+}
+else
+{
+    <p>Please enter the password to view this page.</p>
+}
+
+
+@code {
+    private NewsletterModel newsletterModel = new NewsletterModel { Rubriques = new List<SingleRubriqueModel>() };
+    private bool isAuthorized = false;
+    private bool showRubriques = false;
+    private bool shouldSubmit = false;
+
+
+    private async Task HandleSubmit()
+    {
+        if (!shouldSubmit)
+        {
+            return;
+        }
+
+        string htmlContent = string.Empty;
+        foreach (var rubrique in newsletterModel.Rubriques)
+        {
+            if (!rubrique.Sections.Any())
+            {
+                continue;
+            }
+
+            htmlContent += emailContentOptions.Value.RubriqueImageHTMLContent.Replace("{{RubriqueSourceImage}}", rubrique.RubriqueSourceImage);
+            foreach (var section in rubrique.Sections)
+            {
+                htmlContent += emailContentOptions.Value.RubriqueSectionHTMLContent.Replace("{{ImageBase64}}", section.ImageBase64)
+                                                                                   .Replace("{{Title}}", section.Title)
+                                                                                   .Replace("{{Text}}", section.Text)
+                                                                                   .Replace("{{ButtonUrl}}", section.ButtonUrl)
+                                                                                   .Replace("{{ButtonText}}", section.ButtonText)
+                                                                                   .Replace("{{ButtonDisplay}}", section.ButtonDisplay ? "inline-block" : "none");
+            }
+        }
+
+        if (string.IsNullOrEmpty(htmlContent))
+        {
+            return;
+        }
+
+        var EmailModel = new NewsLetterEmailContent();
+        EmailModel.RefNumber = newsletterModel.RefNumber;
+        EmailModel.Content = htmlContent;
+        await emailService.SendMailFromTemplateAsync<NewsLetterEmailContent>(EmailModel);
+    }
+    private async Task AttemptSubmit()
+    {
+        shouldSubmit = true; // Set the flag to true when explicitly submitting
+        await HandleSubmit(); // Call your submit handler
+    }
+
+    private void AddRubrique()
+    {
+        newsletterModel.Rubriques.Add(new SingleRubriqueModel { Sections = new List<SingleSectionModel>() });
+    }
+
+    private void DeleteRubrique(SingleRubriqueModel rubrique)
+    {
+        newsletterModel.Rubriques.Remove(rubrique);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var password = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the password:");
+            if (password == adminOptionsAccessor.Value.Password)
+            {
+                isAuthorized = true;
+            }
+            else
+            {
+                isAuthorized = false;
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.GetMultipleFiles().First();
+        try
+        {
+            // using var memoryStream = new MemoryStream();
+            // await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(memoryStream);
+            // var bytes = memoryStream.ToArray();
+            // newsletterModel.ImageBase64 = Convert.ToBase64String(bytes);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+}

@@ -1,0 +1,110 @@
+﻿@using RobinsonNewsletter.Core.Helpers
+@using RobinsonNewsletter.Core.Models
+@inject IJSRuntime jsRuntime
+@inject IServiceProvider serviceProvider
+
+<EditForm Model="@newSection" OnSubmit="@HandleSectionSubmit">
+    <DataAnnotationsValidator />
+    <div class="@GetFormClass()" id="sections">
+        <div class="form-group">
+            <label for="image">Image:</label>
+            <InputText id="image" class="form-control" @bind-Value="newSection.ImageBase64" />
+            <ValidationMessage For="@(() => newSection.ImageBase64)" />
+        </div>
+
+        <div class="form-group">
+            <label for="title">Title:</label>
+            <InputText id="title" class="form-control" @bind-Value="newSection.Title" />
+            <ValidationMessage For="@(() => newSection.Title)" />
+        </div>
+
+        <div class="form-group">
+            <label for="text">Text:</label>
+            <InputTextArea id="text" class="form-control" @bind-Value="newSection.Text" />
+            <ValidationMessage For="@(() => newSection.Text)" />
+        </div>
+
+        <div class="form-check">
+            <InputCheckbox class="form-check-input" id="buttondisplay" @bind-Value="newSection.ButtonDisplay" />
+            <label for="buttondisplay">Button:</label>
+            <ValidationMessage For="@(() => newSection.ButtonDisplay)" />
+        </div>
+
+        @if (newSection.ButtonDisplay)
+        {
+            <div class="form-group">
+                <label for="buttontext">Button Text:</label>
+                <InputText id="buttontext" class="form-control" @bind-Value="newSection.ButtonText" />
+                <ValidationMessage For="@(() => newSection.ButtonText)" />
+            </div>
+
+            <div class="form-group">
+                <label for="buttonurl">Button Url:</label>
+                <InputText id="buttonurl" class="form-control" @bind-Value="newSection.ButtonUrl" />
+                <ValidationMessage For="@(() => newSection.ButtonUrl)" />
+            </div>
+        }
+
+        @if (showSave)
+        {
+            <button type="submit" class="btn btn-primary">Save</button>
+        }
+    </div>
+</EditForm>
+
+@if (!showSave)
+{
+    <div style="display: flex; justify-content: space-between; align-items: center; background-color: #DCD9D9">
+        <p style="margin: 0; font-weight: bold;">@newSection.Title</p>
+        <div>
+            <button type="button" @onclick="ModifySection" style="background-color: transparent; border: none; padding: 0;">
+                <i style="color: black;" class="bi bi-pencil-square"></i>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public SingleSectionModel newSection { get; set; }
+    private bool isCollapsed = false;
+    private bool showSave = true;
+    private EditContext editContext;
+
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(newSection);
+    }
+
+    private async Task HandleSectionSubmit()
+    {
+        editContext.EnableDataAnnotationsValidation(serviceProvider);
+        bool isFormValid = editContext.Validate();
+
+        if (isFormValid || (!isFormValid && !newSection.ButtonDisplay))
+        {
+            var validationsCount = editContext.GetValidationMessages().Count();
+            if (string.IsNullOrEmpty(newSection.ButtonText) && string.IsNullOrEmpty(newSection.ButtonUrl) && validationsCount == 2)
+            {
+                isCollapsed = true;
+                await Task.Delay(400);
+                showSave = false;
+            }
+            StateHasChanged();
+        }
+        StateHasChanged();
+    }
+
+    private string GetFormClass()
+    {
+
+        return isCollapsed ? "collapse-transition" : "collapse-show";
+    }
+
+    private async Task ModifySection()
+    {
+        isCollapsed = false;
+        await Task.Delay(400);
+        showSave = true;
+    }
+}
