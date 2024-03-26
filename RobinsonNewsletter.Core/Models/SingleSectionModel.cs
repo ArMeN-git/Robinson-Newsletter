@@ -24,4 +24,6 @@ public class SingleSectionModel
 
     [Required(ErrorMessage = ErrorMessages.RequiredMessage)]
     public bool ButtonDisplay { get; set; }
+
+    public bool IsSaved { get; set; }
 }

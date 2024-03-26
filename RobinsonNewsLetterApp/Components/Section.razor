@@ -24,7 +24,7 @@
             <ValidationMessage For="@(() => newSection.Text)" />
         </div>
 
-        <div class="form-check">
+        <div class="form-check checkbox">
             <InputCheckbox class="form-check-input" id="buttondisplay" @bind-Value="newSection.ButtonDisplay" />
             <label for="buttondisplay">Button:</label>
             <ValidationMessage For="@(() => newSection.ButtonDisplay)" />
@@ -47,7 +47,7 @@
 
         @if (showSave)
         {
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" class="btn btn-primary save">Save</button>
         }
     </div>
 </EditForm>
@@ -67,37 +67,49 @@
 @code {
     [Parameter]
     public SingleSectionModel newSection { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnClick { get; set; }
+
     private bool isCollapsed = false;
     private bool showSave = true;
     private EditContext editContext;
+    private ValidationMessageStore messageStore;
+
+    private void ResetEditContext()
+    {
+        editContext = new EditContext(newSection);
+        messageStore = new ValidationMessageStore(editContext);
+        editContext.EnableDataAnnotationsValidation(serviceProvider);
+    }
 
     protected override void OnInitialized()
     {
         editContext = new EditContext(newSection);
+        messageStore = new ValidationMessageStore(editContext);
     }
 
     private async Task HandleSectionSubmit()
     {
-        editContext.EnableDataAnnotationsValidation(serviceProvider);
+        ResetEditContext();
         bool isFormValid = editContext.Validate();
 
-        if (isFormValid || (!isFormValid && !newSection.ButtonDisplay))
+        if (isFormValid || (!isFormValid && !newSection.ButtonDisplay &&
+                                        (string.IsNullOrEmpty(newSection.ButtonText) && string.IsNullOrEmpty(newSection.ButtonUrl) && editContext.GetValidationMessages().Count() == 2) ||
+                                        ((string.IsNullOrEmpty(newSection.ButtonText) || string.IsNullOrEmpty(newSection.ButtonUrl)) && editContext.GetValidationMessages().Count() == 1)))
         {
-            var validationsCount = editContext.GetValidationMessages().Count();
-            if (string.IsNullOrEmpty(newSection.ButtonText) && string.IsNullOrEmpty(newSection.ButtonUrl) && validationsCount == 2)
-            {
-                isCollapsed = true;
-                await Task.Delay(400);
-                showSave = false;
-            }
-            StateHasChanged();
+
+            isCollapsed = true;
+            await Task.Delay(400);
+            showSave = false;
+            newSection.IsSaved = true;
+            await OnClick.InvokeAsync("Section saved");
         }
         StateHasChanged();
     }
 
     private string GetFormClass()
     {
-
         return isCollapsed ? "collapse-transition" : "collapse-show";
     }
 
@@ -106,5 +118,7 @@
         isCollapsed = false;
         await Task.Delay(400);
         showSave = true;
+        newSection.IsSaved = false;
+        await OnClick.InvokeAsync("Modify section");
     }
 }

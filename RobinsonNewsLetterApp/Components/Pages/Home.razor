@@ -1,9 +1,11 @@
 ﻿@page "/"
 @rendermode InteractiveServer
 @using Microsoft.Extensions.Options
+@using RobinsonNewsletter.Core.Constants
 @using RobinsonNewsletter.Core.Models;
 @using RobinsonNewsletter.Core.Services.Email;
 @using Microsoft.AspNetCore.Http;
+@using System.Text.RegularExpressions
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IWebHostEnvironment Environment
 @inject IEmailService emailService
@@ -20,8 +22,22 @@
         <h1 class="form-title">Form of Newsletter</h1>
 
         <div class="form-container">
-            <EditForm Model="@newsletterModel" OnValidSubmit="@HandleSubmit">
+            <EditForm Model="@newsletterModel">
                 <DataAnnotationsValidator />
+                <div class="form-group">
+                    <label for="formFile" class="form-label">Upload Mails</label>
+                    <InputFile type="file" class="form-control" id="formFile customIdUploadFile" style="padding:6px;" OnChange="HandleFileMailListUpload" />
+                    <ValidationMessage For="@(() => newsletterModel.FilePlaceHolder)" />
+                    @if (showValidation)
+                    {
+                        <div class="validation-message">@FileValidationMessage</div>
+                    }
+                </div>
+                <div class="form-group" id="subject">
+                    <label>Write email subject</label>
+                    <InputText class ="form-control" @bind-Value="newsletterModel.Subject" />
+                    <ValidationMessage For ="@(()=>newsletterModel.Subject)" />
+                </div>
 
                 <div class="form-group">
                     <label for="refnumber">Ref Number:</label>
@@ -29,12 +45,12 @@
                     <ValidationMessage For="@(() => newsletterModel.RefNumber)" />
                 </div>
 
-                <button type="button" class="btn btn-success" @onclick="AddRubrique">Add Rubrique</button>
+                <button type="button" class="btn btn-success addrubrique" @onclick="AddRubrique">Add Rubrique</button>
 
                 @foreach (var rubrique in newsletterModel.Rubriques)
                 {
                     <div style="position: relative;">
-                        <Rubrique currentRubrique="rubrique"></Rubrique>
+                        <Rubrique currentRubrique="rubrique" OnClick="RubriqueSaveHandler"></Rubrique>
                         <button type="button" @onclick="() => DeleteRubrique(rubrique)" style="position: absolute; top: 0; right: 10%; background-color: transparent; border: none; padding: 0;">
                             <i style="color: black;" class="bi bi-trash3"></i>
                         </button>
@@ -42,12 +58,25 @@
                 }
 
                 <br>
-                @if (newsletterModel.Rubriques.Any())
+                @if (newsletterModel.Rubriques.Count > 0 && newsletterModel.Rubriques.TrueForAll(r => r.IsSaved) && emails.Count > 0)
                 {
-                    <button type="button" class="btn btn-primary" @onclick="AttemptSubmit">Submit</button>
+                    <div class="flex-container">
+                        <button type="button" class="btn btn-primary submit" @onclick="AttemptSubmit">Submit</button>
+                    </div>
                 }
+
             </EditForm>
+
         </div>
+    </div>
+    <div id="successModal" class="modal" style="display:@ModalDisplay;">
+
+        <!-- Modal content -->
+        <div class="modal-content" style="text-align:center">
+            <p>Email has been successfully sent!</p>
+            <button type="button" class="btn btn-primary" @onclick="ResetForm">Okay, send a new email</button>
+        </div>
+
     </div>
 }
 else
@@ -56,12 +85,16 @@ else
 }
 
 
+
 @code {
     private NewsletterModel newsletterModel = new NewsletterModel { Rubriques = new List<SingleRubriqueModel>() };
     private bool isAuthorized = false;
     private bool showRubriques = false;
     private bool shouldSubmit = false;
-
+    private bool showValidation = true;
+    private string FileValidationMessage;
+    private List<string> emails = new List<string>();
+    private bool isModalVisible = false;
 
     private async Task HandleSubmit()
     {
@@ -98,8 +131,22 @@ else
         var EmailModel = new NewsLetterEmailContent();
         EmailModel.RefNumber = newsletterModel.RefNumber;
         EmailModel.Content = htmlContent;
-        await emailService.SendMailFromTemplateAsync<NewsLetterEmailContent>(EmailModel);
+        EmailModel.Subject = newsletterModel.Subject;
+        await emailService.SendMailFromTemplateAsync<NewsLetterEmailContent>(EmailModel, emails);
+
+
+
+        isModalVisible = true;
+        StateHasChanged(); // Notify the UI to update
+
     }
+
+    private void CloseModal()
+    {
+        isModalVisible = false;
+    }
+    private string ModalDisplay => isModalVisible ? "block" : "none";
+
     private async Task AttemptSubmit()
     {
         shouldSubmit = true; // Set the flag to true when explicitly submitting
@@ -121,19 +168,17 @@ else
         if (firstRender)
         {
             var password = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the password:");
-            if (password == adminOptionsAccessor.Value.Password)
+            while (password != adminOptionsAccessor.Value.Password)
             {
-                isAuthorized = true;
+                password = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect password, try again:");
             }
-            else
-            {
-                isAuthorized = false;
-            }
+
+            isAuthorized = true;
             StateHasChanged();
         }
     }
 
-    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    private async Task HandleImageUpload(InputFileChangeEventArgs e)
     {
         var file = e.GetMultipleFiles().First();
         try
@@ -147,5 +192,71 @@ else
         {
             Console.WriteLine(ex);
         }
+    }
+    private async Task HandleFileMailListUpload(InputFileChangeEventArgs e)
+    {
+        var file = e.GetMultipleFiles().First();
+        try
+        {
+            if (file != null)
+            {
+                if (file.ContentType == "text/plain")
+                {
+                    showValidation = false;
+                    if (file.Size > ValidationLiterals.EmailFileSize)
+                    {
+                        showValidation = true;
+                        FileValidationMessage = "File size cannot exceed 1MB.";
+                        return;
+                    }
+                    using var stream = file.OpenReadStream(maxAllowedSize: ValidationLiterals.EmailFileSize); // Limit file size to 1MB
+                    using var reader = new StreamReader(stream);
+                    string line;
+                    while ((line = await reader.ReadLineAsync()) != null)
+                    {
+                        var emailPattern = @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b";
+                        if (Regex.IsMatch(line, emailPattern))
+                        {
+                            var matches = Regex.Matches(line, emailPattern);
+                            foreach (Match match in matches)
+                            {
+                                emails.Add(match.Value);
+                            }
+                        }
+                    }
+                    if (emails.Count == 0)
+                    {
+                        showValidation = true;
+                        FileValidationMessage = "Cannot retrieve emails from provided txt file.";
+                    }
+                }
+                else
+                {
+                    showValidation = true;
+                    FileValidationMessage = "Invalid file extension. Only .txt files are allowed.";
+                    Console.WriteLine("Please upload a text (.txt) file.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    void RubriqueSaveHandler(string msg)
+    {
+        StateHasChanged();
+    }
+    private void ResetForm()
+    {
+        // Reset your form fields and models here
+        emails.Clear();
+        newsletterModel = new NewsletterModel { Rubriques = new List<SingleRubriqueModel>() };
+
+        // Close the modal programmatically if needed
+        isModalVisible = false;
+        // You might need to call StateHasChanged() if the UI does not update as expected
+        StateHasChanged();
     }
 }

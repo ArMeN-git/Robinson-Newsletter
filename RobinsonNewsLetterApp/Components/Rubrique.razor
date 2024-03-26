@@ -4,9 +4,9 @@
 
 <div>
     <div class="@GetFormClass()">
-        <div class="form-group">
-            <label for="buttonurl">Choisir Rubrique:</label>
-            <select @onchange="OnSelectionChanged">
+        <div class="form-group custom-dropdown">
+            <label for="rubrique-select" class="dropdown-label">Choisir Rubrique:</label>
+            <select id="rubrique-select" class="select-style" @onchange="OnSelectionChanged">
                 <option value="" selected disabled>Select a rubrique</option>
                 @foreach (var kvp in rubriqueOptionsAccessor.Value.RubriqueImages)
                 {
@@ -17,20 +17,20 @@
 
         @if (showSections)
         {
-            <button type="button" class="btn btn-warning" @onclick="AddSection">Add Section</button>
+            <button type="button" class="btn btn-warning addsection" @onclick="AddSection">Add Section</button>
         }
 
         @foreach (var section in currentRubrique.Sections)
         {
-            <div style="position: relative;">
-                <Section newSection="section"></Section>
+            <div style="position: relative;" class="saveContainer">
+                <Section newSection="section" OnClick="SectionSaveHandler"></Section>
                 <button type="button" @onclick="() => DeleteSection(section)" style="position: absolute; top: 0; right: 10%; background-color: transparent; border: none; padding: 0;">
                     <i style="color: black;" class="bi bi-trash3"></i>
                 </button>
             </div>
         }
 
-        @if (currentRubrique.Sections.Any())
+        @if (currentRubrique.Sections.Any() && currentRubrique.Sections.All(s => s.IsSaved))
         {
             <button type="button" @onclick="SaveRubrique" class="btn btn-secondary">Save Rubrique</button>
         }
@@ -49,9 +49,15 @@
     </div>    
 }
 
+
+
 @code {
     [Parameter]
     public SingleRubriqueModel currentRubrique { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnClick { get; set; }
+
     private bool showSections = false;
     private string selectedKey;
 
@@ -87,14 +93,23 @@
     private async Task SaveRubrique()
     {
         isCollapsed = true;
-        await Task.Delay(300);
+        await Task.Delay(450);
         showSave = false;
+        currentRubrique.IsSaved = true;
+        await OnClick.InvokeAsync("Rubrique saved");
     }
 
     private async Task ModifyRubrique()
     {
         isCollapsed = false;
-        await Task.Delay(400);
+        // await Task.Delay(200);
         showSave = true;
+        currentRubrique.IsSaved = false;
+        await OnClick.InvokeAsync("Modify rubrique");
+    }
+
+    void SectionSaveHandler(string msg)
+    {
+        StateHasChanged();
     }
 }
