@@ -5,7 +5,7 @@
 <div>
     <div class="@GetFormClass()">
         <div class="form-group custom-dropdown">
-            <label for="rubrique-select" class="dropdown-label">Choisir Rubrique:</label>
+            <label for="rubrique-select" class="dropdown-label">Choose a Rubrique:</label>
             <select id="rubrique-select" class="select-style" @onchange="OnSelectionChanged">
                 <option value="" selected disabled>Select a rubrique</option>
                 @foreach (var kvp in rubriqueOptionsAccessor.Value.RubriqueImages)
