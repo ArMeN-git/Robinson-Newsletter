@@ -3,6 +3,8 @@ public class EmailSettings
 {
     public string ApiKey { get; set; }
     public string SenderEmail { get; set; }
-    public string TemplateId { get; set; }
-    public List<string> Recipients { get; set; }
+    public string NewsLetterTemplateID { get; set; }
+
+    public string TwoFactorTemplateID { get; set; }
+
 }

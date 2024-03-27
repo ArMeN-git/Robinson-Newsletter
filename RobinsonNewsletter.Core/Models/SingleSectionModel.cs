@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using RobinsonNewsletter.Core.Constants;
+using System.ComponentModel.DataAnnotations;
 
 namespace RobinsonNewsletter.Core.Models;
 

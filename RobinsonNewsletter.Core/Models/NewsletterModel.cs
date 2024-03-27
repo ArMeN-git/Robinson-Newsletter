@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using RobinsonNewsletter.Core.Constants;
 using System.ComponentModel.DataAnnotations;
 
 namespace RobinsonNewsletter.Core.Models;
@@ -14,12 +14,6 @@ public class NewsletterModel
 
     public List<SingleRubriqueModel> Rubriques { get; set; }
 
-    [Required(ErrorMessage = ErrorMessages.RequiredMessage)]    
-    public string Subject{get; set; }
-}
-
-public static class ErrorMessages
-{
-    public const string RequiredMessage = "This field is required.";
-    public const string InvalidUrlMessage = "Invalid URL format.";
+    [Required(ErrorMessage = ErrorMessages.RequiredMessage)]
+    public string Subject { get; set; }
 }

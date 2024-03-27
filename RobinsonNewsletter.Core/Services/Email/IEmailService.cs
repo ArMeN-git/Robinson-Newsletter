@@ -2,5 +2,5 @@
 
 public interface IEmailService
 {
-    Task SendMailFromTemplateAsync<T>(T model, List<string> emails, CancellationToken cancellationToken = default);
+    Task SendMailFromTemplateAsync<T>(T model, List<string> emails, string templateId, CancellationToken cancellationToken = default);
 }

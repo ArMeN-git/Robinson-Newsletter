@@ -6,6 +6,7 @@
 @using RobinsonNewsletter.Core.Services.Email;
 @using Microsoft.AspNetCore.Http;
 @using System.Text.RegularExpressions
+@using System.Diagnostics
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IWebHostEnvironment Environment
 @inject IEmailService emailService
@@ -13,6 +14,9 @@
 @inject IOptions<RubriqueImageOptions> rubriqueOptionsAccessor
 @inject IOptions<AdminOptions> adminOptionsAccessor
 @inject IOptions<EmailContentOptions> emailContentOptions
+@inject IOptionsMonitor<EmailSettings> emailOptionsMonitor
+@inject NavigationManager manager;
+
 
 @if (isAuthorized)
 {
@@ -35,8 +39,8 @@
                 </div>
                 <div class="form-group" id="subject">
                     <label>Write email subject</label>
-                    <InputText class ="form-control" @bind-Value="newsletterModel.Subject" />
-                    <ValidationMessage For ="@(()=>newsletterModel.Subject)" />
+                    <InputText class="form-control" @bind-Value="newsletterModel.Subject" />
+                    <ValidationMessage For="@(()=>newsletterModel.Subject)" />
                 </div>
 
                 <div class="form-group">
@@ -69,15 +73,15 @@
 
         </div>
     </div>
-    <div id="successModal" class="modal" style="display:@ModalDisplay;">
-
-        <!-- Modal content -->
-        <div class="modal-content" style="text-align:center">
-            <p>Email has been successfully sent!</p>
-            <button type="button" class="btn btn-primary" @onclick="ResetForm">Okay, send a new email</button>
+    @if (isModalVisible)
+    {
+        <div id="successModal" class="modal" style="display: block;">
+            <div class="modal-content" style="text-align:center">
+                <p>Email has been successfully sent!</p>
+                <button type="button" class="btn btn-primary" @onclick="ResetForm">Okay, send a new email</button>
+            </div>
         </div>
-
-    </div>
+    }
 }
 else
 {
@@ -132,25 +136,21 @@ else
         EmailModel.RefNumber = newsletterModel.RefNumber;
         EmailModel.Content = htmlContent;
         EmailModel.Subject = newsletterModel.Subject;
-        await emailService.SendMailFromTemplateAsync<NewsLetterEmailContent>(EmailModel, emails);
-
-
+        await emailService.SendMailFromTemplateAsync<NewsLetterEmailContent>(EmailModel, emails, emailOptionsMonitor.CurrentValue.NewsLetterTemplateID);
 
         isModalVisible = true;
-        StateHasChanged(); // Notify the UI to update
-
+        StateHasChanged();
     }
 
     private void CloseModal()
     {
         isModalVisible = false;
     }
-    private string ModalDisplay => isModalVisible ? "block" : "none";
 
     private async Task AttemptSubmit()
     {
-        shouldSubmit = true; // Set the flag to true when explicitly submitting
-        await HandleSubmit(); // Call your submit handler
+        shouldSubmit = true;
+        await HandleSubmit();
     }
 
     private void AddRubrique()
@@ -165,12 +165,29 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        int pinCount = 0;
         if (firstRender)
         {
             var password = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the password:");
             while (password != adminOptionsAccessor.Value.Password)
             {
                 password = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect password, try again:");
+            }
+            var TwoFactorMod = new TwoFactorModel();
+            TwoFactorMod.OneTimePin = new Random().Next(100000, 1000000);
+
+            await emailService.SendMailFromTemplateAsync<TwoFactorModel>(TwoFactorMod, ["rocetman2020@gmail.com"], emailOptionsMonitor.CurrentValue.TwoFactorTemplateID);
+
+            var pin = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the pin:");
+
+            while (pin != TwoFactorMod.OneTimePin.ToString())
+            {
+                pinCount += 1;
+                pin = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect pin, try again. Remaining attempts: " + (3 - pinCount));
+                if (pinCount == 2)
+                {
+                    return;
+                }
             }
 
             isAuthorized = true;
@@ -200,13 +217,13 @@ else
         {
             if (file != null)
             {
-                if (file.ContentType == "text/plain")
+                if (file.ContentType == ValidationLiterals.TxtFileContent)
                 {
                     showValidation = false;
                     if (file.Size > ValidationLiterals.EmailFileSize)
                     {
                         showValidation = true;
-                        FileValidationMessage = "File size cannot exceed 1MB.";
+                        FileValidationMessage = ErrorMessages.FileSizeExceeds;
                         return;
                     }
                     using var stream = file.OpenReadStream(maxAllowedSize: ValidationLiterals.EmailFileSize); // Limit file size to 1MB
@@ -227,14 +244,13 @@ else
                     if (emails.Count == 0)
                     {
                         showValidation = true;
-                        FileValidationMessage = "Cannot retrieve emails from provided txt file.";
+                        FileValidationMessage = ErrorMessages.CannotRetrieveEmails;
                     }
                 }
                 else
                 {
                     showValidation = true;
-                    FileValidationMessage = "Invalid file extension. Only .txt files are allowed.";
-                    Console.WriteLine("Please upload a text (.txt) file.");
+                    FileValidationMessage = ErrorMessages.WrongFileFormat;
                 }
             }
         }
@@ -248,15 +264,12 @@ else
     {
         StateHasChanged();
     }
+
     private void ResetForm()
     {
-        // Reset your form fields and models here
         emails.Clear();
         newsletterModel = new NewsletterModel { Rubriques = new List<SingleRubriqueModel>() };
-
-        // Close the modal programmatically if needed
         isModalVisible = false;
-        // You might need to call StateHasChanged() if the UI does not update as expected
         StateHasChanged();
     }
 }
