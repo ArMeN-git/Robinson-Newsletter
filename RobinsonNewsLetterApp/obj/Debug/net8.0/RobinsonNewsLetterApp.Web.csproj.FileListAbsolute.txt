@@ -1,6 +1,0 @@
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.csproj.AssemblyReference.cache
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.AssemblyInfoInputs.cache
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.AssemblyInfo.cs
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.csproj.CoreCompileInputs.cache
-C:\Users\Armen\source\repos\RobinsonNewsLetterApp\obj\Debug\net8.0\RobinsonNewsLetterApp.Web.MvcApplicationPartsAssemblyInfo.cache
