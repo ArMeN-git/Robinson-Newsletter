@@ -168,26 +168,29 @@ else
         int pinCount = 0;
         if (firstRender)
         {
+            // check password
             var password = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the password:");
             while (password != adminOptionsAccessor.Value.Password)
             {
                 password = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect password, try again:");
             }
+
+            // verify with email OTP
+            var email = await JSRuntime.InvokeAsync<string>("prompt", "Please enter an email to receive OTP. Please make sure you write a correct email.");
             var TwoFactorMod = new TwoFactorModel();
             TwoFactorMod.OneTimePin = new Random().Next(100000, 1000000);
+            await emailService.SendMailFromTemplateAsync<TwoFactorModel>(TwoFactorMod, [email], emailOptionsMonitor.CurrentValue.TwoFactorTemplateID);
 
-            await emailService.SendMailFromTemplateAsync<TwoFactorModel>(TwoFactorMod, ["rocetman2020@gmail.com"], emailOptionsMonitor.CurrentValue.TwoFactorTemplateID);
-
+            // check OTP from email
             var pin = await JSRuntime.InvokeAsync<string>("prompt", "Please enter the pin:");
-
             while (pin != TwoFactorMod.OneTimePin.ToString())
             {
-                pinCount += 1;
-                pin = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect pin, try again. Remaining attempts: " + (3 - pinCount));
                 if (pinCount == 2)
                 {
                     return;
                 }
+                pinCount += 1;
+                pin = await JSRuntime.InvokeAsync<string>("prompt", "Incorrect pin, try again. Remaining attempts: " + (3 - pinCount));
             }
 
             isAuthorized = true;
@@ -195,21 +198,22 @@ else
         }
     }
 
-    private async Task HandleImageUpload(InputFileChangeEventArgs e)
-    {
-        var file = e.GetMultipleFiles().First();
-        try
-        {
-            // using var memoryStream = new MemoryStream();
-            // await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(memoryStream);
-            // var bytes = memoryStream.ToArray();
-            // newsletterModel.ImageBase64 = Convert.ToBase64String(bytes);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex);
-        }
-    }
+    // private async Task HandleImageUpload(InputFileChangeEventArgs e)
+    // {
+    //     var file = e.GetMultipleFiles().First();
+    //     try
+    //     {
+    //         // using var memoryStream = new MemoryStream();
+    //         // await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(memoryStream);
+    //         // var bytes = memoryStream.ToArray();
+    //         // newsletterModel.ImageBase64 = Convert.ToBase64String(bytes);
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine(ex);
+    //     }
+    // }
+
     private async Task HandleFileMailListUpload(InputFileChangeEventArgs e)
     {
         var file = e.GetMultipleFiles().First();
